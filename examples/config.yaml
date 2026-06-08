@@ -1,0 +1,11 @@
+out_dir: output
+mask_dir: examples/masks
+engine: iopaint
+model: lama
+model_dir: ../.model-cache
+device: cpu
+region: none
+dry_run: false
+verbose: true
+skip_patterns:
+  - "*.gif"

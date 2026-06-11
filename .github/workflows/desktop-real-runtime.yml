@@ -1,0 +1,127 @@
+name: Desktop real runtime release
+
+on:
+  workflow_dispatch:
+    inputs:
+      retention_days:
+        description: Artifact retention days
+        required: false
+        default: "7"
+      notarize_macos:
+        description: Sign and notarize the macOS dmg using repository secrets
+        required: false
+        default: "false"
+
+jobs:
+  real-runtime-package:
+    name: Real runtime package ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            runner: windows-latest
+            artifact_name: ImageInpaint-Windows-x64-real-runtime
+            artifact_path: release/ImageInpaint-Windows-x64.zip
+          - platform: macos-arm64
+            runner: macos-15
+            artifact_name: ImageInpaint-macOS-arm64-real-runtime
+            artifact_path: release/ImageInpaint-macOS.dmg
+          - platform: macos-intel
+            runner: macos-15-intel
+            artifact_name: ImageInpaint-macOS-intel-real-runtime
+            artifact_path: release/ImageInpaint-macOS.dmg
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify repository boundaries
+        run: python packaging/verify-repository-boundaries.py
+
+      - name: Prepare Windows IOPaint runtime
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: .\packaging\prepare-iopaint-runtime-windows.ps1 -RuntimeDir .runtime\iopaint -PythonCommand python -Force
+
+      - name: Build Windows package with real runtime
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: .\packaging\build-windows.ps1 -RuntimeDir .runtime\iopaint -PythonCommand python
+
+      - name: Verify Windows real runtime package
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: .\packaging\verify-release-windows.ps1
+
+      - name: Verify Windows zip smoke
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: .\packaging\verify-windows-zip-smoke.ps1
+
+      - name: Verify Windows checksum
+        if: matrix.platform == 'windows'
+        run: python packaging/verify-checksum.py ${{ matrix.artifact_path }}
+
+      - name: Prepare macOS IOPaint runtime
+        if: startsWith(matrix.platform, 'macos')
+        shell: bash
+        run: bash packaging/prepare-iopaint-runtime-macos.sh --runtime-dir=.runtime/iopaint --python=python --force
+
+      - name: Build macOS package with real runtime
+        if: startsWith(matrix.platform, 'macos')
+        shell: bash
+        run: bash packaging/build-macos.sh --runtime-dir=.runtime/iopaint --python=python
+
+      - name: Verify macOS real runtime package
+        if: startsWith(matrix.platform, 'macos')
+        shell: bash
+        run: bash packaging/verify-release-macos.sh
+
+      - name: Verify macOS dmg smoke
+        if: startsWith(matrix.platform, 'macos')
+        shell: bash
+        run: bash packaging/verify-macos-dmg-smoke.sh --require-iopaint
+
+      - name: Verify macOS install smoke
+        if: startsWith(matrix.platform, 'macos')
+        shell: bash
+        run: bash packaging/verify-macos-install-smoke.sh --require-iopaint
+
+      - name: Verify macOS checksum
+        if: startsWith(matrix.platform, 'macos')
+        run: python packaging/verify-checksum.py ${{ matrix.artifact_path }}
+
+      - name: Sign and notarize macOS package
+        if: startsWith(matrix.platform, 'macos') && inputs.notarize_macos == 'true'
+        shell: bash
+        env:
+          APPLE_DEVELOPER_ID_APPLICATION: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_NOTARY_KEYCHAIN_PROFILE: ${{ secrets.APPLE_NOTARY_KEYCHAIN_PROFILE }}
+        run: |
+          bash packaging/sign-notarize-macos.sh
+          cp release/ImageInpaint-macOS-notarized.dmg release/ImageInpaint-macOS.dmg
+          python packaging/verify-checksum.py --write release/ImageInpaint-macOS.dmg
+          bash packaging/verify-macos-dmg-smoke.sh --require-iopaint
+          bash packaging/verify-macos-install-smoke.sh --require-iopaint
+          python packaging/verify-checksum.py release/ImageInpaint-macOS.dmg
+
+      - name: Upload real runtime package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            ${{ matrix.artifact_path }}
+            ${{ matrix.artifact_path }}.sha256
+          if-no-files-found: error
+          retention-days: ${{ fromJSON(inputs.retention_days) }}

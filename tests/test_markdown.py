@@ -43,3 +43,17 @@ def test_build_tasks_records_skip_reasons(tmp_path: Path) -> None:
     assert [task.should_process for task in tasks] == [False, False]
     assert tasks[0].reason == "remote image skipped"
     assert tasks[1].reason == "local image does not exist"
+
+
+def test_build_tasks_skips_unsupported_local_image_format(tmp_path: Path) -> None:
+    image_dir = tmp_path / "images"
+    image_dir.mkdir()
+    (image_dir / "animated.gif").write_bytes(b"gif")
+    md_path = tmp_path / "doc.md"
+    md_text = "![gif](images/animated.gif)"
+    md_path.write_text(md_text, encoding="utf-8")
+
+    tasks = build_tasks(md_text, md_path)
+
+    assert tasks[0].should_process is False
+    assert tasks[0].reason == "unsupported image format: .gif"

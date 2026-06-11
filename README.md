@@ -29,9 +29,32 @@ images, or large caches.
 - Run IOPaint/LaMa through `iopaint run`.
 - Keep the source document and source images unchanged.
 - Write backups, processed images, and a rewritten output document.
-- Provide a CLI and a small Tkinter GUI.
+- Provide a CLI and a desktop GUI with pre-check, progress, output opening, log
+  viewing, and cache maintenance.
+
+## Desktop App
+
+The project is being shaped into a normal Windows/macOS desktop app. End-user
+packages are built with PyInstaller and should let users open `ImageInpaint.exe`
+or `ImageInpaint.app` without manually installing Python.
+
+User-facing docs:
+
+- [User Guide](docs/USER_GUIDE.md)
+- [Windows Guide](docs/WINDOWS.md)
+- [macOS Guide](docs/MACOS.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+
+Developer packaging docs:
+
+- [Development and Packaging](docs/DEVELOPMENT.md)
+- [Release Acceptance Matrix](docs/ACCEPTANCE_MATRIX.md)
+- [Manual User Smoke Checklist](docs/MANUAL_USER_SMOKE.md)
 
 ## Installation
+
+These source install steps are for developers. Normal users should use a
+platform package.
 
 Python 3.10+ is required. IOPaint has heavier dependencies, including PyTorch,
 so a Python version supported by your IOPaint/PyTorch build is recommended.
@@ -76,8 +99,9 @@ image-inpaint examples\document.md --out output --mask-dir examples\masks --dry-
 python -m md_image_inpaint --gui
 ```
 
-The GUI writes the same output layout as the CLI and shows the run log in the
-window.
+The GUI writes the same output layout as the CLI, supports dry-run pre-checks,
+shows user-readable progress, and can open the output folder, result document,
+and saved run log.
 
 ## Output Layout
 
@@ -90,9 +114,13 @@ output/
   backups/
     original.md
     images/
+  logs/
+    run.log
 ```
 
 The source document and source images are not modified in place.
+If the requested output directory already contains files, a numbered sibling
+directory is used so existing output is not overwritten.
 
 ## Masks
 
@@ -166,6 +194,12 @@ Do not commit:
 - model weights, checkpoints, or caches.
 - local runtimes such as `.runtime/` or `.venv/`.
 - real customer/user images, screenshots, or logs.
+
+Before publishing or opening a release PR, run:
+
+```powershell
+python packaging/verify-repository-boundaries.py
+```
 
 ## License
 

@@ -6,23 +6,27 @@ from pathlib import Path
 
 from .engine import EngineError, run_engine
 from .markdown import build_tasks, rewrite_markdown
-from .masks import create_region_mask, find_matching_mask
-from .models import ImageTask, RunConfig, RunResult, matches_skip_pattern
+from .masks import create_region_mask, find_matching_mask, mask_size_matches
+from .models import ImageTask, ProgressEvent, RunConfig, RunResult, matches_skip_pattern
 
 
 def run(config: RunConfig) -> RunResult:
+    _raise_if_cancelled(config)
     markdown_path = config.markdown_path.resolve()
     markdown_text = markdown_path.read_text(encoding="utf-8")
     out_dir = config.out_dir.resolve()
     output_images_dir = out_dir / "images"
-    output_markdown_path = out_dir / "document.md"
 
     tasks = build_tasks(markdown_text, markdown_path)
     _apply_skip_patterns(tasks, config.skip_patterns)
     logs: list[str] = [f"Scanning Markdown: {markdown_path}"]
     logs.extend(_planning_logs(tasks))
+    _emit_progress(config, "scan", f"Found {len(tasks)} image reference(s).", tasks)
 
     if config.dry_run:
+        processable = _attach_masks(tasks, config, out_dir / "generated_masks", logs, dry_run=True)
+        _emit_progress(config, "masks", f"Pre-check found {len(processable)} image(s) ready for processing.", tasks)
+        _emit_progress(config, "complete", "Pre-check complete.", tasks)
         return RunResult(
             markdown_path=markdown_path,
             output_markdown_path=None,
@@ -30,22 +34,35 @@ def run(config: RunConfig) -> RunResult:
             tasks=tasks,
             logs=logs + ["Dry run enabled; no files were written."],
             skipped_count=sum(1 for task in tasks if not task.should_process),
+            failed_count=sum(1 for task in tasks if task.should_process and task.error),
+            dry_run=True,
         )
 
+    out_dir = _next_available_output_dir(out_dir)
+    output_images_dir = out_dir / "images"
+    output_markdown_path = out_dir / "document.md"
+    logs.append(f"Output folder: {out_dir}")
     _prepare_output_dirs(out_dir)
     _backup_sources(markdown_path, tasks, out_dir, logs)
+    _emit_progress(config, "backup", "Backed up source files.", tasks)
+    if _is_cancelled(config):
+        return _cancelled_result(config, markdown_path, out_dir, output_images_dir, tasks, logs)
 
     generated_mask_dir = out_dir / "generated_masks"
     processable = _attach_masks(tasks, config, generated_mask_dir, logs)
+    _emit_progress(config, "masks", f"Prepared {len(processable)} image(s) for processing.", tasks)
+    if _is_cancelled(config):
+        return _cancelled_result(config, markdown_path, out_dir, output_images_dir, tasks, logs)
 
     if processable:
+        _emit_progress(config, "processing", "Processing images...", tasks)
         with tempfile.TemporaryDirectory(prefix="md-image-inpaint-") as tmp:
             tmp_dir = Path(tmp)
             batch_image_dir = tmp_dir / "images"
             batch_mask_dir = tmp_dir / "masks"
             batch_image_dir.mkdir()
             batch_mask_dir.mkdir()
-            _prepare_batch_files(processable, batch_image_dir, batch_mask_dir)
+            _prepare_batch_files(processable, batch_image_dir, batch_mask_dir, config)
             try:
                 logs.extend(run_engine(config, tasks, batch_image_dir, batch_mask_dir, output_images_dir))
             except EngineError as exc:
@@ -57,6 +74,9 @@ def run(config: RunConfig) -> RunResult:
     else:
         logs.append("No images were sent to IOPaint.")
 
+    if _is_cancelled(config):
+        return _cancelled_result(config, markdown_path, out_dir, output_images_dir, tasks, logs)
+    _emit_progress(config, "writing", "Writing result document.", tasks)
     rewritten = rewrite_markdown(markdown_text, tasks, out_dir)
     output_markdown_path.write_text(rewritten, encoding="utf-8")
     logs.append(f"Wrote Markdown: {output_markdown_path}")
@@ -64,10 +84,52 @@ def run(config: RunConfig) -> RunResult:
     success_count = sum(1 for task in tasks if task.success)
     failed_count = sum(1 for task in tasks if task.should_process and not task.success)
     skipped_count = sum(1 for task in tasks if not task.should_process)
+    log_path = _write_run_log(out_dir, logs, success_count, skipped_count, failed_count)
+    _emit_progress(config, "complete", "Processing complete.", tasks)
     return RunResult(
         markdown_path=markdown_path,
         output_markdown_path=output_markdown_path,
         output_images_dir=output_images_dir,
+        log_path=log_path,
+        tasks=tasks,
+        logs=logs,
+        success_count=success_count,
+        skipped_count=skipped_count,
+        failed_count=failed_count,
+    )
+
+
+def _raise_if_cancelled(config: RunConfig) -> None:
+    if _is_cancelled(config):
+        raise EngineError("processing cancelled by user")
+
+
+def _is_cancelled(config: RunConfig) -> bool:
+    return bool(config.cancel_token and config.cancel_token.cancelled)
+
+
+def _cancelled_result(
+    config: RunConfig,
+    markdown_path: Path,
+    out_dir: Path,
+    output_images_dir: Path,
+    tasks: list[ImageTask],
+    logs: list[str],
+) -> RunResult:
+    for task in tasks:
+        if task.should_process and not task.success:
+            task.error = task.error or "processing cancelled by user"
+    logs.append("Processing cancelled by user; no result Markdown was written.")
+    success_count = sum(1 for task in tasks if task.success)
+    failed_count = sum(1 for task in tasks if task.should_process and not task.success)
+    skipped_count = sum(1 for task in tasks if not task.should_process)
+    log_path = _write_run_log(out_dir, logs, success_count, skipped_count, failed_count)
+    _emit_progress(config, "cancelled", "Processing cancelled.", tasks)
+    return RunResult(
+        markdown_path=markdown_path,
+        output_markdown_path=None,
+        output_images_dir=output_images_dir,
+        log_path=log_path,
         tasks=tasks,
         logs=logs,
         success_count=success_count,
@@ -79,6 +141,40 @@ def run(config: RunConfig) -> RunResult:
 def _prepare_output_dirs(out_dir: Path) -> None:
     (out_dir / "images").mkdir(parents=True, exist_ok=True)
     (out_dir / "backups" / "images").mkdir(parents=True, exist_ok=True)
+    (out_dir / "logs").mkdir(parents=True, exist_ok=True)
+
+
+def _next_available_output_dir(out_dir: Path) -> Path:
+    if not out_dir.exists():
+        return out_dir
+    try:
+        if out_dir.is_dir() and not any(out_dir.iterdir()):
+            return out_dir
+    except OSError:
+        pass
+
+    parent = out_dir.parent
+    stem = out_dir.name
+    counter = 1
+    while True:
+        candidate = parent / f"{stem}-{counter}"
+        if not candidate.exists():
+            return candidate
+        if candidate.is_dir():
+            try:
+                if not any(candidate.iterdir()):
+                    return candidate
+            except OSError:
+                pass
+        counter += 1
+
+
+def _write_run_log(out_dir: Path, logs: list[str], success_count: int, skipped_count: int, failed_count: int) -> Path:
+    log_path = out_dir / "logs" / "run.log"
+    summary = f"Summary: processed={success_count}, skipped={skipped_count}, failed={failed_count}"
+    log_path.write_text("\n".join([*logs, summary, ""]) , encoding="utf-8")
+    logs.append(f"Wrote log: {log_path}")
+    return log_path
 
 
 def _apply_skip_patterns(tasks: list[ImageTask], patterns: list[str]) -> None:
@@ -113,7 +209,13 @@ def _backup_sources(markdown_path: Path, tasks: list[ImageTask], out_dir: Path, 
         logs.append(f"Backed up {len(seen)} local image(s): {backup_image_dir}")
 
 
-def _attach_masks(tasks: list[ImageTask], config: RunConfig, generated_mask_dir: Path, logs: list[str]) -> list[ImageTask]:
+def _attach_masks(
+    tasks: list[ImageTask],
+    config: RunConfig,
+    generated_mask_dir: Path,
+    logs: list[str],
+    dry_run: bool = False,
+) -> list[ImageTask]:
     processable: list[ImageTask] = []
     for task in tasks:
         if not task.should_process:
@@ -128,11 +230,22 @@ def _attach_masks(tasks: list[ImageTask], config: RunConfig, generated_mask_dir:
 
         mask_path = find_matching_mask(image_path, config.mask_dir)
         if mask_path is None:
+            if dry_run and config.region and config.region != "none":
+                task.reason = f"fallback area will generate mask: {config.region}"
+                processable.append(task)
+                logs.append(f"Ready: {task.reference.raw_path}; fallback area will generate mask={config.region}")
+                continue
             mask_path = create_region_mask(image_path, config.region, generated_mask_dir)
         if mask_path is None:
             task.should_process = False
             task.reason = "mask missing"
             logs.append(f"Skipped: {task.reference.raw_path}; mask missing")
+            continue
+        if not mask_size_matches(image_path, mask_path):
+            task.should_process = False
+            task.reason = "mask size does not match image"
+            task.mask_path = mask_path
+            logs.append(f"Skipped: {task.reference.raw_path}; mask size does not match image")
             continue
         task.mask_path = mask_path
         processable.append(task)
@@ -140,11 +253,15 @@ def _attach_masks(tasks: list[ImageTask], config: RunConfig, generated_mask_dir:
     return processable
 
 
-def _prepare_batch_files(tasks: list[ImageTask], batch_image_dir: Path, batch_mask_dir: Path) -> None:
+def _prepare_batch_files(tasks: list[ImageTask], batch_image_dir: Path, batch_mask_dir: Path, config: RunConfig) -> None:
     for index, task in enumerate(tasks, start=1):
         image_path = task.reference.resolved_path
         if image_path is None or task.mask_path is None:
             continue
+        if config.progress_callback:
+            config.progress_callback(
+                ProgressEvent(stage="processing", message=f"Preparing image: {task.reference.raw_path}", current=index, total=len(tasks))
+            )
         safe_name = f"{index:04d}-{_safe_stem(image_path.stem)}{image_path.suffix.lower()}"
         batch_image = batch_image_dir / safe_name
         batch_mask = batch_mask_dir / safe_name
@@ -178,3 +295,24 @@ def _unique_name(directory: Path, name: str) -> str:
         candidate = f"{stem}-{counter}{suffix}"
         counter += 1
     return candidate
+
+
+def _emit_progress(config: RunConfig, stage: str, message: str, tasks: list[ImageTask]) -> None:
+    if config.progress_callback is None:
+        return
+    total = len(tasks)
+    success_count = sum(1 for task in tasks if task.success)
+    skipped_count = sum(1 for task in tasks if not task.should_process)
+    failed_count = sum(1 for task in tasks if task.should_process and (task.error is not None or (stage == "complete" and not task.success)))
+    current = min(total, success_count + skipped_count + failed_count)
+    config.progress_callback(
+        ProgressEvent(
+            stage=stage,
+            message=message,
+            current=current,
+            total=total,
+            success_count=success_count,
+            skipped_count=skipped_count,
+            failed_count=failed_count,
+        )
+    )

@@ -43,6 +43,11 @@ def create_region_mask(image_path: Path, region: str | None, output_dir: Path) -
     return mask_path
 
 
+def mask_size_matches(image_path: Path, mask_path: Path) -> bool:
+    with Image.open(image_path) as image, Image.open(mask_path) as mask:
+        return image.size == mask.size
+
+
 def _region_box(width: int, height: int, region: str) -> tuple[int, int, int, int]:
     block_w = max(1, width // 4)
     block_h = max(1, height // 4)

@@ -29,6 +29,7 @@ classifiers = [
 
 [project.optional-dependencies]
 iopaint = ["iopaint>=1.5.0"]
+desktop = ["pyinstaller>=6.0"]
 dev = ["pytest>=8.0"]
 
 [project.scripts]

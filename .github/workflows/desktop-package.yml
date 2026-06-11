@@ -1,0 +1,119 @@
+name: Desktop package
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Tests
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify repository boundaries
+        run: python packaging/verify-repository-boundaries.py
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[dev]
+
+      - name: Run tests
+        run: python -m pytest -q
+
+  package:
+    name: Package ${{ matrix.platform }}
+    needs: test
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            runner: windows-latest
+            artifact_name: ImageInpaint-Windows-x64
+            artifact_path: release/ImageInpaint-Windows-x64.zip
+          - platform: macos-arm64
+            runner: macos-15
+            artifact_name: ImageInpaint-macOS-arm64
+            artifact_path: release/ImageInpaint-macOS.dmg
+          - platform: macos-intel
+            runner: macos-15-intel
+            artifact_name: ImageInpaint-macOS-intel
+            artifact_path: release/ImageInpaint-macOS.dmg
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build Windows desktop package
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: .\packaging\build-windows.ps1 -NoIopaint
+
+      - name: Verify Windows packaged process smoke
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: .\packaging\verify-packaged-process-smoke.ps1
+
+      - name: Verify Windows install smoke
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: .\packaging\verify-windows-install-smoke.ps1
+
+      - name: Verify Windows zip smoke
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: .\packaging\verify-windows-zip-smoke.ps1
+
+      - name: Verify Windows checksum
+        if: matrix.platform == 'windows'
+        run: python packaging/verify-checksum.py ${{ matrix.artifact_path }}
+
+      - name: Build macOS desktop package
+        if: startsWith(matrix.platform, 'macos')
+        shell: bash
+        run: bash packaging/build-macos.sh --no-iopaint
+
+      - name: Verify macOS packaged process smoke
+        if: startsWith(matrix.platform, 'macos')
+        shell: bash
+        run: bash packaging/verify-packaged-process-smoke.sh
+
+      - name: Verify macOS dmg smoke
+        if: startsWith(matrix.platform, 'macos')
+        shell: bash
+        run: bash packaging/verify-macos-dmg-smoke.sh
+
+      - name: Verify macOS install smoke
+        if: startsWith(matrix.platform, 'macos')
+        shell: bash
+        run: bash packaging/verify-macos-install-smoke.sh
+
+      - name: Verify macOS checksum
+        if: startsWith(matrix.platform, 'macos')
+        run: python packaging/verify-checksum.py ${{ matrix.artifact_path }}
+
+      - name: Upload desktop package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            ${{ matrix.artifact_path }}
+            ${{ matrix.artifact_path }}.sha256
+          if-no-files-found: error
+          retention-days: 14

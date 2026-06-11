@@ -23,9 +23,9 @@ def test_cli_dry_run_prints_planned_images(tmp_path: Path, capsys) -> None:
 def test_cli_skip_pattern_prints_skip_reason(tmp_path: Path, capsys) -> None:
     image_dir = tmp_path / "images"
     image_dir.mkdir()
-    Image.new("RGB", (4, 4), "blue").save(image_dir / "sample.gif")
+    Image.new("RGB", (4, 4), "blue").save(image_dir / "sample.png")
     md_path = tmp_path / "document.md"
-    md_path.write_text("![sample](images/sample.gif)", encoding="utf-8")
+    md_path.write_text("![sample](images/sample.png)", encoding="utf-8")
 
     exit_code = main(
         [
@@ -33,11 +33,11 @@ def test_cli_skip_pattern_prints_skip_reason(tmp_path: Path, capsys) -> None:
             "--out",
             str(tmp_path / "output"),
             "--skip-pattern",
-            "*.gif",
+            "*.png",
             "--dry-run",
         ]
     )
 
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert "Will skip: images/sample.gif; matched skip pattern: *.gif" in captured.out
+    assert "Will skip: images/sample.png; matched skip pattern: *.png" in captured.out

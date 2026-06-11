@@ -9,6 +9,7 @@ venv/
 .env.*
 build/
 dist/
+release/
 *.egg-info/
 output/
 output*/
@@ -20,6 +21,11 @@ models/
 model_cache/
 .model-cache/
 .runtime/
+fake-iopaint-runtime/
+packaged-process-smoke-output/
+release-smoke-output/
+windows-install-smoke/
+windows-zip-install-smoke/
 checkpoints/
 weights/
 *.pt

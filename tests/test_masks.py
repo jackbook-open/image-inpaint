@@ -2,7 +2,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from md_image_inpaint.masks import create_region_mask, find_matching_mask
+from md_image_inpaint.masks import create_region_mask, find_matching_mask, mask_size_matches
 
 
 def test_find_matching_mask_prefers_exact_filename(tmp_path: Path) -> None:
@@ -41,3 +41,12 @@ def test_create_bottom_strip_region_mask(tmp_path: Path) -> None:
     with Image.open(mask_path) as mask:
         assert mask.getpixel((5, 0)) == 0
         assert mask.getpixel((5, 9)) == 255
+
+
+def test_mask_size_matches_detects_mismatch(tmp_path: Path) -> None:
+    image = tmp_path / "image.png"
+    mask = tmp_path / "mask.png"
+    Image.new("RGB", (10, 10), "blue").save(image)
+    Image.new("L", (8, 8), 255).save(mask)
+
+    assert mask_size_matches(image, mask) is False

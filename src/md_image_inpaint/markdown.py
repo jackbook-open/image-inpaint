@@ -7,6 +7,7 @@ from .models import ImageReference, ImageTask, is_remote_path
 
 
 IMAGE_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
+SUPPORTED_IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp", ".bmp")
 
 
 def extract_markdown_path(target_text: str) -> str:
@@ -54,6 +55,8 @@ def build_tasks(markdown_text: str, markdown_path: Path) -> list[ImageTask]:
             tasks.append(ImageTask(ref, False, "remote image skipped"))
         elif not ref.exists:
             tasks.append(ImageTask(ref, False, "local image does not exist"))
+        elif ref.resolved_path and ref.resolved_path.suffix.lower() not in SUPPORTED_IMAGE_SUFFIXES:
+            tasks.append(ImageTask(ref, False, f"unsupported image format: {ref.resolved_path.suffix.lower() or 'none'}"))
         else:
             tasks.append(ImageTask(ref, True, "ready"))
     return tasks

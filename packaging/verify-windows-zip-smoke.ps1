@@ -1,7 +1,8 @@
 param(
     [string]$ZipPath = "release\ImageInpaint-Windows-x64.zip",
     [string]$ScratchDir = "",
-    [switch]$FullExtract
+    [switch]$FullExtract,
+    [switch]$RequireIopaint
 )
 
 $ErrorActionPreference = "Stop"
@@ -48,16 +49,19 @@ try {
         foreach ($Entry in $Archive.Entries) {
             [void]$EntryNames.Add($Entry.FullName.Replace("/", "\"))
         }
-        foreach ($Path in @(
+        $ExpectedEntries = @(
             "ImageInpaint\ImageInpaint.exe",
             "ImageInpaint\ImageInpaintSmoke.exe",
             "ImageInpaint\install-user.ps1",
             "ImageInpaint\uninstall-user.ps1",
             "ImageInpaint\Install Image Inpaint.cmd",
             "ImageInpaint\Uninstall Image Inpaint.cmd",
-            "ImageInpaint\README-FIRST.txt",
-            "ImageInpaint\runtime\iopaint.cmd"
-        )) {
+            "ImageInpaint\README-FIRST.txt"
+        )
+        if ($RequireIopaint) {
+            $ExpectedEntries += "ImageInpaint\runtime\iopaint.cmd"
+        }
+        foreach ($Path in $ExpectedEntries) {
             if (-not $EntryNames.Contains($Path)) {
                 throw "Windows zip smoke missing expected entry: $Path"
             }
@@ -86,12 +90,31 @@ try {
         }
     }
 
-    & $SmokeExe --smoke-check --require-iopaint
+    $SmokeArgs = @("--smoke-check")
+    if ($RequireIopaint) {
+        $SmokeArgs += "--require-iopaint"
+    }
+    & $SmokeExe @SmokeArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Windows zip smoke runtime check failed."
     }
 
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "packaging\verify-windows-install-smoke.ps1" -PackageDir $PackageDir -ScratchDir "windows-zip-install-smoke" -LaunchSmoke -RequireIopaint
+    $InstallSmokeArgs = @(
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "packaging\verify-windows-install-smoke.ps1",
+        "-PackageDir",
+        $PackageDir,
+        "-ScratchDir",
+        "windows-zip-install-smoke",
+        "-LaunchSmoke"
+    )
+    if ($RequireIopaint) {
+        $InstallSmokeArgs += "-RequireIopaint"
+    }
+    & powershell.exe @InstallSmokeArgs
     if ($LASTEXITCODE -ne 0) {
         throw "Windows zip install smoke failed."
     }

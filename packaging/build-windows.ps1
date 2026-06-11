@@ -124,7 +124,11 @@ New-Item -ItemType Directory -Force -Path $ReleaseDir | Out-Null
 $ZipPath = Join-Path $ReleaseDir "ImageInpaint-Windows-x64.zip"
 New-ZipFromDirectory "dist\ImageInpaint" $ZipPath
 Invoke-Native "Write Windows checksum" $Python @("packaging\verify-checksum.py", "--write", $ZipPath)
-Invoke-Native "Windows zip smoke check" "powershell.exe" @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "packaging\verify-windows-zip-smoke.ps1")
+$ZipSmokeArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "packaging\verify-windows-zip-smoke.ps1")
+if (-not $NoIopaint) {
+    $ZipSmokeArgs += "-RequireIopaint"
+}
+Invoke-Native "Windows zip smoke check" "powershell.exe" $ZipSmokeArgs
 
 Write-Host ""
 Write-Host "Build complete: dist\ImageInpaint"

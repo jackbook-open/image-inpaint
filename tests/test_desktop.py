@@ -132,8 +132,10 @@ def test_windows_build_includes_user_installer() -> None:
     assert "ZipFile" in zip_smoke
     assert "--smoke-check" in zip_smoke
     assert "--require-iopaint" in zip_smoke
+    assert "RequireIopaint" in zip_smoke
+    assert "if ($RequireIopaint)" in zip_smoke
     assert "verify-windows-install-smoke.ps1" in zip_smoke
-    assert "-LaunchSmoke -RequireIopaint" in zip_smoke
+    assert "-LaunchSmoke" in zip_smoke
     assert "Windows zip smoke passed" in zip_smoke
     assert "ImageInpaintSmoke" in build_script
     assert "ImageInpaintSmoke" in spec_text
@@ -216,6 +218,7 @@ def test_ci_runs_packaged_process_smoke_on_each_desktop_package() -> None:
     assert "--process-smoke" in macos_smoke
     assert "IMAGE_INPAINT_RUNTIME_DIR" in windows_smoke
     assert "IMAGE_INPAINT_RUNTIME_DIR" in macos_smoke
+    assert "bash ./packaging/make-fake-iopaint-runtime.sh" in macos_smoke
 
 
 def test_real_runtime_release_workflow_runs_platform_verifiers() -> None:

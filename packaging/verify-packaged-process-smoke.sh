@@ -26,7 +26,7 @@ if [[ ! -x "$SMOKE_EXE" ]]; then
 fi
 
 if [[ ! -x "$RUNTIME_DIR/iopaint" ]]; then
-  ./packaging/make-fake-iopaint-runtime.sh "$RUNTIME_DIR"
+  bash ./packaging/make-fake-iopaint-runtime.sh "$RUNTIME_DIR"
 fi
 
 rm -rf "$OUT_DIR"

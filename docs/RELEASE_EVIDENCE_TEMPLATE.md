@@ -12,6 +12,8 @@ repository when they contain large artifacts, model caches, or user files.
 - Release owner:
 - Windows artifact:
 - Windows artifact SHA256:
+- Windows setup artifact:
+- Windows setup artifact SHA256:
 - macOS Apple Silicon artifact:
 - macOS Apple Silicon artifact SHA256:
 - macOS Intel artifact:
@@ -45,12 +47,13 @@ repository when they contain large artifacts, model caches, or user files.
 - Runtime preparation command and result:
 - Build command and result:
 - `packaging\verify-release-windows.ps1` result:
+- `packaging\verify-windows-installer-smoke.ps1 -RequireIopaint` result:
 - `packaging\verify-windows-zip-smoke.ps1` result:
 - `packaging\verify-windows-zip-smoke.ps1 -FullExtract` result:
 - Manual smoke checklist used: `docs/MANUAL_USER_SMOKE.md`
 - Non-developer user smoke tester:
 - Windows version:
-- Time from download/extract to first app window:
+- Time from download/install to first app window:
 - Opened without Python, terminal, or dependency installation:
 - GUI workflow result:
   - Select Markdown:

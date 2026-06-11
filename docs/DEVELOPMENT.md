@@ -44,6 +44,19 @@ To bundle a prepared IOPaint/PyTorch runtime directory:
 .\packaging\build-windows.ps1 -RuntimeDir C:\path\to\iopaint-runtime
 ```
 
+To also build the normal-user `.exe` installer, install Inno Setup 6 and add
+`-Installer`:
+
+```powershell
+.\packaging\build-windows.ps1 -RuntimeDir C:\path\to\iopaint-runtime -Installer
+```
+
+If `ISCC.exe` is not on `PATH`, pass it explicitly:
+
+```powershell
+.\packaging\build-windows.ps1 -RuntimeDir C:\path\to\iopaint-runtime -Installer -InnoSetupCompiler "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+```
+
 The runtime preparation script checks for 64-bit Python 3.10, 3.11, or 3.12
 before creating the runtime. If the host only has Python 3.13 or a 32-bit Python,
 the script stops before downloading large dependencies and asks for a compatible
@@ -58,6 +71,9 @@ The build runs a packaged `--smoke-check`, writes
 `dist\ImageInpaint\ImageInpaint.exe`, and creates
 `release\ImageInpaint-Windows-x64.zip` plus
 `release\ImageInpaint-Windows-x64.zip.sha256`.
+When `-Installer` is supplied, it also creates
+`release\ImageInpaint-Setup-x64.exe` plus
+`release\ImageInpaint-Setup-x64.exe.sha256`.
 It also runs `packaging\verify-windows-install-smoke.ps1`, which installs and
 uninstalls the packaged app inside temporary user folders and a test registry
 key so the normal desktop shortcut, Start menu shortcut, and uninstall entry are
@@ -74,6 +90,11 @@ Full extraction mode also launches the installed smoke executable with
 `--require-iopaint`.
 The zip smoke also verifies the `.sha256` sidecar with
 `python packaging/verify-checksum.py`.
+
+Installer builds run `packaging\verify-windows-installer-smoke.ps1`, which
+silently installs the setup exe to a scratch directory, runs
+`ImageInpaintSmoke.exe`, and silently uninstalls it. Real-runtime installer
+builds run that smoke with `-RequireIopaint`.
 
 Windows builds also include `ImageInpaintSmoke.exe`, a console-mode copy of the
 same desktop entrypoint used only by packaging scripts. Release checks use it so
@@ -205,6 +226,14 @@ dist\ImageInpaint\ImageInpaint.exe --smoke-check
 .\packaging\verify-windows-zip-smoke.ps1
 ```
 
+To include the lightweight setup exe in this local smoke, install Inno Setup and
+run:
+
+```powershell
+.\packaging\build-windows.ps1 -NoIopaint -Installer
+.\packaging\verify-windows-installer-smoke.ps1
+```
+
 On macOS:
 
 ```bash
@@ -226,6 +255,7 @@ Windows real-processing release verification:
 ```powershell
 .\packaging\verify-release-windows.ps1
 .\packaging\verify-windows-zip-smoke.ps1
+.\packaging\verify-windows-installer-smoke.ps1 -RequireIopaint
 ```
 
 Use `.\packaging\verify-windows-zip-smoke.ps1 -FullExtract` for an additional
@@ -243,11 +273,12 @@ macOS real-processing release verification:
 ## Continuous Packaging
 
 The `Desktop package` GitHub Actions workflow runs tests, builds the lightweight
-Windows zip and separate Apple Silicon and Intel macOS dmg packages without
-IOPaint, runs each packaged `--smoke-check`, runs each packaged app through the
-fake-runtime processing smoke, verifies the macOS dmg installer layout, verifies
-that the app can be copied to and launched from a temporary Applications folder,
-and uploads the packages as workflow artifacts.
+Windows setup exe and zip plus separate Apple Silicon and Intel macOS dmg
+packages without IOPaint, runs each packaged `--smoke-check`, runs each packaged
+app through the fake-runtime processing smoke, verifies the Windows setup exe
+with a silent install/uninstall smoke, verifies the macOS dmg installer layout,
+verifies that the app can be copied to and launched from a temporary
+Applications folder, and uploads the packages as workflow artifacts.
 
 The macOS matrix intentionally uses `macos-15` for Apple Silicon and
 `macos-15-intel` for Intel. Do not collapse these to `macos-latest` unless the

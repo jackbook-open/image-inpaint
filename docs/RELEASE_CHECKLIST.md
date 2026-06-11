@@ -14,13 +14,15 @@ smoke steps.
 - `python -m pytest -q` passes.
 - `python packaging/verify-repository-boundaries.py` passes.
 - `python packaging/verify-checksum.py <artifact>` passes for every uploaded
-  zip or dmg.
+  setup exe, zip, or dmg.
 - Release hosts have 64-bit Python 3.10, 3.11, or 3.12 available for preparing
   IOPaint/PyTorch runtimes.
 - Runtime preparation scripts complete on release hosts:
   - `packaging\prepare-iopaint-runtime-windows.ps1`
   - `packaging/prepare-iopaint-runtime-macos.sh`
 - GitHub Actions `Desktop package` passes on Windows and macOS.
+- Windows artifact `ImageInpaint-Setup-x64.exe` is uploaded.
+- Windows artifact `ImageInpaint-Setup-x64.exe.sha256` is uploaded.
 - Windows artifact `ImageInpaint-Windows-x64.zip` is uploaded.
 - Windows artifact `ImageInpaint-Windows-x64.zip.sha256` is uploaded.
 - macOS artifacts are uploaded for both Apple Silicon and Intel:
@@ -31,6 +33,9 @@ smoke steps.
 - Real-runtime Windows package passes
   `packaging\verify-windows-install-smoke.ps1 -PackageDir dist\ImageInpaint
   -LaunchSmoke -RequireIopaint`, proving the installed copy can start.
+- Windows setup artifact passes `packaging\verify-windows-installer-smoke.ps1`.
+- Real-runtime Windows setup artifact passes
+  `packaging\verify-windows-installer-smoke.ps1 -RequireIopaint`.
 - Windows downloaded zip artifact passes `packaging\verify-windows-zip-smoke.ps1`.
 - Windows downloaded zip artifact passes
   `packaging\verify-windows-zip-smoke.ps1 -FullExtract` when release time and
@@ -70,8 +75,8 @@ smoke steps.
 
 ## Required Manual User Smoke
 
-- A non-developer Windows user can extract the zip and open
-  `ImageInpaint.exe`.
+- A non-developer Windows user can run `ImageInpaint-Setup-x64.exe`, install the
+  app, and open it from a shortcut.
 - A non-developer macOS user can open the dmg/app and pass the first-run security
   prompts.
 - The GUI can select a Markdown document, run `Pre-check`, start processing, and

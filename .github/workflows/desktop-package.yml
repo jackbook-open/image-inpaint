@@ -60,10 +60,15 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install Inno Setup
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
       - name: Build Windows desktop package
         if: matrix.platform == 'windows'
         shell: pwsh
-        run: .\packaging\build-windows.ps1 -NoIopaint
+        run: .\packaging\build-windows.ps1 -NoIopaint -Installer
 
       - name: Verify Windows packaged process smoke
         if: matrix.platform == 'windows'
@@ -82,7 +87,9 @@ jobs:
 
       - name: Verify Windows checksum
         if: matrix.platform == 'windows'
-        run: python packaging/verify-checksum.py ${{ matrix.artifact_path }}
+        run: |
+          python packaging/verify-checksum.py ${{ matrix.artifact_path }}
+          python packaging/verify-checksum.py release/ImageInpaint-Setup-x64.exe
 
       - name: Build macOS desktop package
         if: startsWith(matrix.platform, 'macos')
@@ -115,5 +122,7 @@ jobs:
           path: |
             ${{ matrix.artifact_path }}
             ${{ matrix.artifact_path }}.sha256
+            release/ImageInpaint-Setup-x64.exe
+            release/ImageInpaint-Setup-x64.exe.sha256
           if-no-files-found: error
           retention-days: 14

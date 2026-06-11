@@ -89,8 +89,10 @@ def test_windows_build_includes_user_installer() -> None:
     installer_dir = project_root / "packaging" / "windows"
     build_script = (project_root / "packaging" / "build-windows.ps1").read_text(encoding="utf-8")
     install_smoke = (project_root / "packaging" / "verify-windows-install-smoke.ps1").read_text(encoding="utf-8")
+    installer_smoke = (project_root / "packaging" / "verify-windows-installer-smoke.ps1").read_text(encoding="utf-8")
     zip_smoke = (project_root / "packaging" / "verify-windows-zip-smoke.ps1").read_text(encoding="utf-8")
     spec_text = (project_root / "packaging" / "pyinstaller-image-inpaint.spec").read_text(encoding="utf-8")
+    inno_script = (installer_dir / "ImageInpaint.iss").read_text(encoding="utf-8")
     install_script = (installer_dir / "install-user.ps1").read_text(encoding="utf-8")
     uninstall_script = (installer_dir / "uninstall-user.ps1").read_text(encoding="utf-8")
     package_readme = (installer_dir / "README-FIRST.txt").read_text(encoding="utf-8")
@@ -100,6 +102,7 @@ def test_windows_build_includes_user_installer() -> None:
     assert (installer_dir / "Uninstall Image Inpaint.cmd").exists()
     assert (installer_dir / "uninstall-user.ps1").exists()
     assert (installer_dir / "README-FIRST.txt").exists()
+    assert (installer_dir / "ImageInpaint.iss").exists()
     assert "Double-click Install Image Inpaint.cmd" in package_readme
     assert "authorized to modify" in package_readme
     assert "README-FIRST.txt" in install_script
@@ -110,6 +113,11 @@ def test_windows_build_includes_user_installer() -> None:
     assert "$global:LASTEXITCODE = 0" in install_script
     assert "$global:LASTEXITCODE = 0" in uninstall_script
     assert "packaging\\windows" in build_script
+    assert "Installer" in build_script
+    assert "Resolve-InnoSetupCompiler" in build_script
+    assert "ImageInpaint-Setup-x64.exe" in build_script
+    assert "verify-windows-installer-smoke.ps1" in build_script
+    assert "Inno Setup compiler was not found" in build_script
     assert "verify-windows-install-smoke.ps1" in build_script
     assert "verify-windows-zip-smoke.ps1" in build_script
     assert "Write Windows checksum" in build_script
@@ -122,6 +130,17 @@ def test_windows_build_includes_user_installer() -> None:
     assert "RequireIopaint" in install_smoke
     assert "ImageInpaintSmoke.exe" in install_smoke
     assert "Windows installed app launch smoke failed" in install_smoke
+    assert "/VERYSILENT" in installer_smoke
+    assert "/SUPPRESSMSGBOXES" in installer_smoke
+    assert "/DIR=$InstallDir" in installer_smoke
+    assert "ImageInpaintSmoke.exe" in installer_smoke
+    assert "Windows installer smoke passed" in installer_smoke
+    assert "RequireIopaint" in installer_smoke
+    assert "OutputBaseFilename=ImageInpaint-Setup-x64" in inno_script
+    assert "PrivilegesRequired=lowest" in inno_script
+    assert "DefaultDirName={localappdata}\\ImageInpaint\\app" in inno_script
+    assert "recursesubdirs createallsubdirs" in inno_script
+    assert "ImageInpaint.exe" in inno_script
     assert "-LaunchSmoke" in build_script
     assert "-RequireIopaint" in build_script
     assert "OpenRead($ResolvedZipPath)" in zip_smoke
@@ -195,6 +214,11 @@ def test_ci_runs_packaged_process_smoke_on_each_desktop_package() -> None:
     assert ".\\packaging\\verify-packaged-process-smoke.ps1" in workflow
     assert "Verify Windows zip smoke" in workflow
     assert ".\\packaging\\verify-windows-zip-smoke.ps1" in workflow
+    assert "Install Inno Setup" in workflow
+    assert "choco install innosetup" in workflow
+    assert ".\\packaging\\build-windows.ps1 -NoIopaint -Installer" in workflow
+    assert "ImageInpaint-Setup-x64.exe" in workflow
+    assert "ImageInpaint-Setup-x64.exe.sha256" in workflow
     assert "Verify Windows checksum" in workflow
     assert "python packaging/verify-checksum.py ${{ matrix.artifact_path }}" in workflow
     assert "macos-arm64" in workflow
@@ -229,6 +253,7 @@ def test_real_runtime_release_workflow_runs_platform_verifiers() -> None:
     assert "prepare-iopaint-runtime-windows.ps1" in workflow
     assert "prepare-iopaint-runtime-macos.sh" in workflow
     assert "build-windows.ps1 -RuntimeDir" in workflow
+    assert "build-windows.ps1 -RuntimeDir .runtime\\iopaint -PythonCommand python -Installer" in workflow
     assert "build-macos.sh --runtime-dir" in workflow
     assert "verify-release-windows.ps1" in workflow
     assert "verify-windows-zip-smoke.ps1" in workflow
@@ -238,6 +263,9 @@ def test_real_runtime_release_workflow_runs_platform_verifiers() -> None:
     assert "verify-macos-dmg-smoke.sh --require-iopaint" in workflow
     assert "verify-macos-install-smoke.sh --require-iopaint" in workflow
     assert "ImageInpaint-Windows-x64-real-runtime" in workflow
+    assert "ImageInpaint-Setup-x64.exe" in workflow
+    assert "ImageInpaint-Setup-x64.exe.sha256" in workflow
+    assert "choco install innosetup" in workflow
     assert "macos-arm64" in workflow
     assert "macos-intel" in workflow
     assert "macos-15" in workflow
@@ -262,12 +290,15 @@ def test_release_evidence_template_tracks_user_ready_requirements() -> None:
     assert "verify-repository-boundaries.py" in template
     assert "python -m pytest -q" in template
     assert "artifact SHA256" in template
+    assert "Windows setup artifact" in template
     assert "artifact checksum uploaded" in template
     assert "Desktop real runtime release" in template
     assert "verify-release-windows.ps1" in template
+    assert "verify-windows-installer-smoke.ps1 -RequireIopaint" in template
     assert "verify-windows-zip-smoke.ps1 -FullExtract" in template
     assert "Manual smoke checklist used: `docs/MANUAL_USER_SMOKE.md`" in template
     assert "Opened without Python, terminal, or dependency installation" in template
+    assert "download/install" in template
     assert "Optional install/uninstall smoke result" in template
     assert "macOS Apple Silicon" in template
     assert "macOS Intel" in template
@@ -292,6 +323,8 @@ def test_acceptance_matrix_maps_goal_to_required_evidence() -> None:
     checklist = (project_root / "docs" / "RELEASE_CHECKLIST.md").read_text(encoding="utf-8")
 
     assert "Windows users can download and start without Python" in matrix
+    assert "ImageInpaint-Setup-x64.exe" in matrix
+    assert "verify-windows-installer-smoke.ps1" in matrix
     assert "macOS Apple Silicon users can open a dmg/app" in matrix
     assert "macOS Intel users can open a dmg/app" in matrix
     assert "Signed and notarized dmg" in matrix
@@ -321,8 +354,9 @@ def test_manual_user_smoke_checklist_covers_non_developer_flows() -> None:
     assert "Do not open a terminal" in smoke
     assert "Time the flow" in smoke
     assert "Windows Smoke" in smoke
+    assert "ImageInpaint-Setup-x64.exe" in smoke
     assert "ImageInpaint-Windows-x64.zip" in smoke
-    assert "Double-click `ImageInpaint.exe`" in smoke
+    assert "desktop or Start menu shortcut" in smoke
     assert "Optional install smoke" in smoke
     assert "macOS Apple Silicon Smoke" in smoke
     assert "macOS Intel Smoke" in smoke

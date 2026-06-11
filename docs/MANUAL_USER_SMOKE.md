@@ -28,12 +28,12 @@ Package filename:
 
 Checksum verified by release owner:
 
-1. Download or receive `ImageInpaint-Windows-x64.zip`.
-2. Extract the zip to a normal user folder such as Downloads or Desktop.
-3. Open the extracted `ImageInpaint` folder.
-4. Open `README-FIRST.txt` and confirm the responsible-use warning is visible.
-5. Double-click `ImageInpaint.exe`.
-6. Record time to first app window. Target: five minutes or less.
+1. Download or receive `ImageInpaint-Setup-x64.exe`.
+2. Confirm the tester did not install Python or open a terminal.
+3. Double-click the setup exe and follow the installer prompts.
+4. Open `Image Inpaint` from the desktop or Start menu shortcut.
+5. Record time to first app window. Target: five minutes or less.
+6. Confirm the responsible-use warning is visible.
 7. Confirm the app runs a startup runtime check and shows the model cache
    location or runtime status in the log.
 8. Choose a Markdown document.
@@ -55,11 +55,13 @@ Checksum verified by release owner:
 
 Optional install smoke:
 
-1. Double-click `Install Image Inpaint.cmd`.
-2. Confirm a desktop shortcut and Start menu entry appear.
-3. Launch from the shortcut.
-4. Run `Uninstall Image Inpaint.cmd`.
-5. Confirm user outputs and model cache are not deleted by uninstall.
+1. Download or receive `ImageInpaint-Windows-x64.zip`.
+2. Extract the zip to a normal user folder such as Downloads or Desktop.
+3. Double-click `Install Image Inpaint.cmd`.
+4. Confirm a desktop shortcut and Start menu entry appear.
+5. Launch from the shortcut.
+6. Run `Uninstall Image Inpaint.cmd`.
+7. Confirm user outputs and model cache are not deleted by uninstall.
 
 ## macOS Apple Silicon Smoke
 

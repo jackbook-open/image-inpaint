@@ -10,8 +10,9 @@ attribution, source marks, or protected content unless you have permission.
 
 ## Start the App
 
-Windows users should download the Windows package, unzip or install it, then
-open `ImageInpaint.exe`.
+Windows users should download `ImageInpaint-Setup-x64.exe`, install it, then
+open `Image Inpaint` from the desktop or Start menu shortcut. A zip package is
+also available for portable-style use.
 
 macOS users should download the macOS package, open `ImageInpaint.app`, and move
 it to Applications if desired.

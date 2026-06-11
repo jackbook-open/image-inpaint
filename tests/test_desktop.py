@@ -118,6 +118,10 @@ def test_windows_build_includes_user_installer() -> None:
     assert "ImageInpaint-Setup-x64.exe" in build_script
     assert "verify-windows-installer-smoke.ps1" in build_script
     assert "Inno Setup compiler was not found" in build_script
+    assert '"/DSourceDir=$InstallerSourceDir"' in build_script
+    assert '"/DSourceDir=`"$InstallerSourceDir`""' not in build_script
+    assert '"/DOutputDir=$ReleaseDir"' in build_script
+    assert '"/DOutputDir=`"$ReleaseDir`""' not in build_script
     assert "verify-windows-install-smoke.ps1" in build_script
     assert "verify-windows-zip-smoke.ps1" in build_script
     assert "Write Windows checksum" in build_script

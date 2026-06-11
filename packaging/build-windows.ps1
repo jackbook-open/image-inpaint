@@ -182,8 +182,8 @@ if ($Installer) {
             Remove-Item -Force
         Invoke-Native "Build Windows installer" $InnoCompiler @(
             "/DAppVersion=$AppVersion",
-            "/DSourceDir=`"$InstallerSourceDir`"",
-            "/DOutputDir=`"$ReleaseDir`"",
+            "/DSourceDir=$InstallerSourceDir",
+            "/DOutputDir=$ReleaseDir",
             "packaging\windows\ImageInpaint.iss"
         )
     } finally {
